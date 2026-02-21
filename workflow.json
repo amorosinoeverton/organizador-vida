@@ -348,6 +348,88 @@
                 950,
                 -250
             ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "combinator": "and",
+                    "conditions": [
+                        {
+                            "id": "starts-with-bang",
+                            "leftValue": "={{ ($json.message || $json.channel_post || {}).text || '' }}",
+                            "operator": {
+                                "operation": "regex",
+                                "type": "string"
+                            },
+                            "rightValue": "^!"
+                        }
+                    ]
+                }
+            },
+            "id": "is-ideia-msg",
+            "name": "IsIdeiaMsg",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.3,
+            "position": [
+                50,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const msg = $input.first().json;\nconst text = (msg.message?.text || msg.channel_post?.text || '').trim();\nconst ideia = text.replace(/^!\\s*/, '');\nconst chatId = String(msg.message?.chat?.id || msg.channel_post?.chat?.id || '');\nconst messageId = msg.message?.message_id || msg.channel_post?.message_id || 0;\nreturn [{ json: { ideia, chatId, messageId, data: new Date().toISOString().split('T')[0] } }];"
+            },
+            "id": "prepare-ideia",
+            "name": "PrepareIdeia",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                300,
+                250
+            ]
+        },
+        {
+            "parameters": {
+                "authentication": "predefinedCredentialType",
+                "body": "={{\nJSON.stringify({\n  parent: { database_id: '<NOTION_INBOX_DATABASE_ID>' },\n  properties: {\n    'Name': { title: [{ type: 'text', text: { content: $json.ideia } }] },\n    'Status': { select: { name: '🔴 Não Assistido' } },\n    'Data de Captura': { date: { start: $json.data } },\n    'Plataforma': { select: { name: 'Outro' } }\n  }\n})\n}}",
+                "contentType": "raw",
+                "method": "POST",
+                "rawContentType": "application/json",
+                "sendBody": true,
+                "url": "https://api.notion.com/v1/pages"
+            },
+            "id": "notion-ideia-save",
+            "name": "NotionIdeiaSave",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.4,
+            "position": [
+                550,
+                250
+            ],
+            "credentials": {
+                "notionApi": {
+                    "id": "hGue3RW0qudvnpKI",
+                    "name": "Notion account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "body": "={{ JSON.stringify({\n  chat_id: $json.chatId,\n  parse_mode: 'HTML',\n  text: '💡 <b>Ideia capturada!</b>\\n──────────────\\n📝 ' + $json.ideia + '\\n──────────────\\n<i>✅ Salva na sua Inbox do Notion</i>',\n  reply_to_message_id: $json.messageId\n}) }}",
+                "contentType": "raw",
+                "method": "POST",
+                "rawContentType": "application/json",
+                "sendBody": true,
+                "url": "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/sendMessage"
+            },
+            "id": "telegram-confirm-ideia",
+            "name": "TelegramConfirmIdeia",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.4,
+            "position": [
+                800,
+                250
+            ]
         }
     ],
     "connections": {
@@ -391,7 +473,58 @@
                 ],
                 [
                     {
+                        "node": "IsIdeiaMsg",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "IsIdeiaMsg": {
+            "main": [
+                [
+                    {
+                        "node": "PrepareIdeia",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
                         "node": "IfFinance",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "PrepareIdeia": {
+            "main": [
+                [
+                    {
+                        "node": "NotionIdeiaSave",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "NotionIdeiaSave": {
+            "main": [
+                [
+                    {
+                        "node": "TelegramConfirmIdeia",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "TelegramConfirmIdeia": {
+            "main": [
+                [
+                    {
+                        "node": "WaitBeforeDelete",
                         "type": "main",
                         "index": 0
                     }

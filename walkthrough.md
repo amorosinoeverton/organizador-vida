@@ -1,14 +1,14 @@
-# 💰 Bot de Controle Financeiro (Telegram → Notion)
+# 🧠 Organizador de Vida (Mega Bot: Finanças + Ideias + Vídeos)
 
-Este bot permite que você registre transações financeiras no Notion enviando apenas uma mensagem de texto ou uma foto do comprovante no Telegram. Ele utiliza IA para categorizar os gastos e permite selecionar o cartão de crédito de forma interativa.
+Este bot é o seu comando central no Telegram. Ele organiza suas finanças, captura links de vídeos e agora permite capturar ideias rápidas para sua Inbox do Notion.
 
 ## 🚀 Funcionalidades Principais
 
-- **Registro por Texto:** Digite algo como `50 almoço no Brooks` e o bot registra automaticamente.
-- **Registro por Foto (OCR):** Envie a foto de um comprovante (Pix, Cartão, Boleto) e a IA extrai valor, local e data.
-- **Categorização Automática:** A IA identifica se o gasto é de Alimentação, Transporte, Lazer, etc.
-- **Seleção de Cartão Interativa:** Se você digitar "cartão" sem especificar, o bot envia botões para você escolher qual cartão usou.
-- **Limpeza Automática:** Todas as mensagens de troca (sua mensagem, a confirmação do bot e perguntas) são apagadas após 1 minuto para manter o chat limpo.
+- **Registro Financeiro (Texto/Foto):** Digite o valor ou mande foto do comprovante para registrar gastos e ganhos.
+- **Captura de Ideias (!):** Use o prefixo `!` para salvar pensamentos e ideias rápidas na sua Inbox.
+- **Categorização por IA:** A IA identifica categorias financeiras e extrai detalhes de comprovantes.
+- **Seleção de Cartão Interativa:** Botões interativos para escolher o cartão de crédito.
+- **Limpeza Automática:** Mantém o chat limpo apagando mensagens antigas após 1 minuto.
 
 ---
 
@@ -30,14 +30,19 @@ Sua base de dados no Notion (chamada **(PES) Transação**) deve conter as segui
 
 ## 🤖 Como usar
 
-### 1. Mensagem de Texto
+### 1. Mensagem de Texto (Finanças)
 Envie uma mensagem começando com o valor:
-- `50 restaurante` (Registra como Saída/Alimentação/Pix)
-- `1500 salário` (Registra como Entrada/Investimento/Pix)
-- `30 uber cartão` (O bot perguntará qual cartão você usou)
+- `50 restaurante` (Gasto em Alimentação)
+- `1500 salário` (Entrada/Receita)
 
-### 2. Foto de Comprovante
-Basta enviar a foto do comprovante. A IA lerá os dados e seguirá o mesmo fluxo de registro.
+### 2. Captura de Ideias (Inbox)
+Envie qualquer texto começando com `!`:
+- `! fazer sorvete de flocos com banana`
+- `! estudar automação de processos`
+O bot removerá o `!` e salvará a frase diretamente na sua base de dados de **Inbox (Ver Depois)**.
+
+### 3. Foto de Comprovante
+Basta enviar a foto do comprovante. A IA lerá os dados e seguirá o mesmo fluxo de registro financeiro.
 
 ---
 
@@ -61,4 +66,5 @@ O workflow `💰 Finanças Pessoais (Telegram → Notion)` é composto por:
 ## 📝 Notas de Versão
 - **v1.0:** Integração base Notion.
 - **v1.5:** IA para extração de dados e melhorias de segurança.
-- **v2.0:** Suporte a fotos (OCR), categorias automáticas, descrições detalhadas e seleção interativa de cartões.
+- **v2.0:** Suporte a fotos (OCR), categorias automáticas e seleção interativa de cartões.
+- **v2.5:** Integração de **Captura de Ideias** via comando `!` salvando na Inbox (Media Tracker).
