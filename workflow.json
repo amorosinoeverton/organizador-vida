@@ -1,0 +1,268 @@
+{
+    "name": "📹 Telegram → Notion Media Tracker (AI Enhanced)",
+    "nodes": [
+        {
+            "parameters": {
+                "updates": [
+                    "message",
+                    "channel_post"
+                ],
+                "additionalFields": {}
+            },
+            "id": "telegram-trigger",
+            "name": "TelegramTrigger",
+            "type": "n8n-nodes-base.telegramTrigger",
+            "typeVersion": 1.2,
+            "position": [
+                240,
+                300
+            ],
+            "credentials": {
+                "telegramApi": {
+                    "id": "SUA_CREDENCIAL_ID",
+                    "name": "Telegram account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "combinator": "and",
+                    "conditions": [
+                        {
+                            "id": "check-url",
+                            "leftValue": "={{ ($json.message || $json.channel_post || {}).text || ($json.message || $json.channel_post || {}).caption || '' }}",
+                            "operator": {
+                                "operation": "regex",
+                                "type": "string"
+                            },
+                            "rightValue": "instagram\\.com|youtube\\.com|youtu\\.be"
+                        }
+                    ],
+                    "options": {
+                        "caseSensitive": false,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 2
+                    }
+                }
+            },
+            "id": "if-supported",
+            "name": "IfSupported",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.3,
+            "position": [
+                480,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const data = $input.first().json;\nconst msg = data.message || data.channel_post || {};\nconst text = msg.text || msg.caption || '';\nconst chatId = msg.chat?.id || '';\nconst messageId = msg.message_id || '';\nreturn [{ json: { text, sessionId: String(chatId), messageId } }];"
+            },
+            "id": "chat-prepare",
+            "name": "ChatPrepare",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                720,
+                450
+            ]
+        },
+        {
+            "parameters": {
+                "options": {
+                    "systemMessage": "Você é um assistente pessoal prestativo e amigável. Responda de forma concisa e direta no Telegram. Responda em Português sempre."
+                },
+                "promptType": "define",
+                "text": "={{ $json.text }}"
+            },
+            "id": "ai-chat-agent",
+            "name": "AiChatAgent",
+            "type": "@n8n/n8n-nodes-langchain.agent",
+            "typeVersion": 1.7,
+            "position": [
+                950,
+                450
+            ]
+        },
+        {
+            "parameters": {
+                "model": "gpt-4o-mini",
+                "options": {}
+            },
+            "id": "openai-model-chat",
+            "name": "OpenAiModelChat",
+            "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+            "typeVersion": 1,
+            "position": [
+                800,
+                650
+            ],
+            "credentials": {
+                "openAiApi": {
+                    "id": "SUA_CREDENCIAL_ID",
+                    "name": "OpenAi account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "contextWindowLength": 10,
+                "sessionIdType": "customKey",
+                "sessionKey": "={{ $json.sessionId }}"
+            },
+            "id": "window-memory",
+            "name": "WindowMemoryChat",
+            "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+            "typeVersion": 1.3,
+            "position": [
+                1050,
+                650
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.telegram.org/botSEU_TOKEN_AQUI/sendMessage",
+                "sendBody": true,
+                "contentType": "raw",
+                "rawContentType": "application/json; charset=utf-8",
+                "body": "={{ JSON.stringify({ chat_id: $node.ChatPrepare.json.sessionId, text: $json.output, reply_to_message_id: $node.ChatPrepare.json.messageId }) }}"
+            },
+            "id": "telegram-reply",
+            "name": "TelegramReplyChat",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.4,
+            "position": [
+                1250,
+                450
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const data = $input.first().json;\nconst msg = data.message || data.channel_post;\nconst text = msg.text || msg.caption || '';\nlet extractedUrl = '';\nlet platform = '';\n// ... (Lógica de extração de link similar ao workflow original)\nreturn [{ json: { videoUrl: extractedUrl, platform, chatId: msg.chat.id, messageId: msg.message_id, originalText: text } }];"
+            },
+            "id": "code-extract",
+            "name": "CodeExtract",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                720,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "resource": "databasePage",
+                "databaseId": {
+                    "__rl": true,
+                    "mode": "id",
+                    "value": "SEU_DATABASE_ID_AQUI"
+                },
+                "title": "={{ $json.output || \"Post do Instagram\" }}",
+                "propertiesUi": {
+                    "propertyValues": [
+                        {
+                            "key": "URL",
+                            "urlValue": "={{ $node.CodeExtract.json.videoUrl }}"
+                        },
+                        {
+                            "key": "Status",
+                            "selectValue": "🔴 Não Assistido"
+                        }
+                    ]
+                }
+            },
+            "id": "notion-save",
+            "name": "NotionSave",
+            "type": "n8n-nodes-base.notion",
+            "typeVersion": 2.2,
+            "position": [
+                1400,
+                200
+            ],
+            "credentials": {
+                "notionApi": {
+                    "id": "SUA_CREDENCIAL_ID",
+                    "name": "Notion account"
+                }
+            }
+        }
+    ],
+    "connections": {
+        "TelegramTrigger": {
+            "main": [
+                [
+                    {
+                        "node": "IfSupported",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "IfSupported": {
+            "main": [
+                [
+                    {
+                        "node": "CodeExtract",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "ChatPrepare",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "ChatPrepare": {
+            "main": [
+                [
+                    {
+                        "node": "AiChatAgent",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "AiChatAgent": {
+            "main": [
+                [
+                    {
+                        "node": "TelegramReplyChat",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "OpenAiModelChat": {
+            "ai_languageModel": [
+                [
+                    {
+                        "node": "AiChatAgent",
+                        "type": "ai_languageModel",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "WindowMemoryChat": {
+            "ai_memory": [
+                [
+                    {
+                        "node": "AiChatAgent",
+                        "type": "ai_memory",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}
