@@ -1,28 +1,21 @@
 {
-    "name": "📹 Telegram → Notion Media Tracker (AI Enhanced)",
+    "name": "💰 Finanças Pessoais (Telegram → Notion)",
     "nodes": [
         {
             "parameters": {
                 "updates": [
                     "message",
-                    "channel_post"
-                ],
-                "additionalFields": {}
+                    "callback_query"
+                ]
             },
-            "id": "telegram-trigger",
+            "id": "tel-trigger-finance",
             "name": "TelegramTrigger",
             "type": "n8n-nodes-base.telegramTrigger",
             "typeVersion": 1.2,
             "position": [
-                240,
-                300
-            ],
-            "credentials": {
-                "telegramApi": {
-                    "id": "SUA_CREDENCIAL_ID",
-                    "name": "Telegram account"
-                }
-            }
+                -200,
+                100
+            ]
         },
         {
             "parameters": {
@@ -30,164 +23,331 @@
                     "combinator": "and",
                     "conditions": [
                         {
-                            "id": "check-url",
-                            "leftValue": "={{ ($json.message || $json.channel_post || {}).text || ($json.message || $json.channel_post || {}).caption || '' }}",
+                            "id": "check-starts-with-number",
+                            "leftValue": "={{ ($json.message || $json.channel_post || {}).text || '' }}",
                             "operator": {
                                 "operation": "regex",
                                 "type": "string"
                             },
-                            "rightValue": "instagram\\.com|youtube\\.com|youtu\\.be"
+                            "rightValue": "^\\d"
                         }
-                    ],
-                    "options": {
-                        "caseSensitive": false,
-                        "leftValue": "",
-                        "typeValidation": "strict",
-                        "version": 2
-                    }
+                    ]
                 }
             },
-            "id": "if-supported",
-            "name": "IfSupported",
+            "id": "if-finance",
+            "name": "IfFinance",
             "type": "n8n-nodes-base.if",
             "typeVersion": 2.3,
             "position": [
-                480,
-                300
+                50,
+                100
             ]
         },
         {
             "parameters": {
-                "jsCode": "const data = $input.first().json;\nconst msg = data.message || data.channel_post || {};\nconst text = msg.text || msg.caption || '';\nconst chatId = msg.chat?.id || '';\nconst messageId = msg.message_id || '';\nreturn [{ json: { text, sessionId: String(chatId), messageId } }];"
+                "jsCode": "const msg = $input.first().json;\nconst text = (msg.message?.text || msg.channel_post?.text || '').trim();\nconst chatId = String(msg.message?.chat?.id || msg.channel_post?.chat?.id || '');\nconst messageId = msg.message?.message_id || msg.channel_post?.message_id || 0;\nconst hoje = new Date().toISOString().split('T')[0];\nreturn [{ json: { rawText: text, chatId, messageId, prompt: 'Analise a mensagem financeira e retorne JSON com: valor (numero), descricao (string curta), tipo (Entrada ou Saida), data (YYYY-MM-DD, hoje=' + hoje + '). Retorne APENAS JSON puro sem markdown. Mensagem: ' + text } }];"
             },
-            "id": "chat-prepare",
-            "name": "ChatPrepare",
+            "id": "finance-prepare",
+            "name": "FinancePrepare",
             "type": "n8n-nodes-base.code",
             "typeVersion": 2,
             "position": [
-                720,
-                450
+                300,
+                50
             ]
         },
         {
             "parameters": {
                 "options": {
-                    "systemMessage": "Você é um assistente pessoal prestativo e amigável. Responda de forma concisa e direta no Telegram. Responda em Português sempre."
+                    "systemMessage": "Você é um assistente financeiro. Analise a mensagem e retorne APENAS um JSON válido.\\n\\nFormato: {\"valor\":50,\"descricao\":\"string\",\"tipo\":\"Saida\",\"categoria\":\"string\",\"metodo\":\"string\",\"data\":\"YYYY-MM-DD\"}\\n\\nRegras de DESCRIÇÃO: Inclua SEMPRE o local/estabelecimento se mencionado. Exemplos: 'jantar no Brooks' → 'Jantar no Brooks', 'almoço no McDonald's' → 'Almoço no McDonald's', 'uber para casa' → 'Uber para casa'.\\n\\nRegras de TIPO: 'Entrada' = salário/renda/receita/ganho. 'Saida' = gasto/compra/despesa.\\n\\nRegras de CATEGORIA (use exatamente um): '🍽️ Alimentação', '🚌 Transporte', '🎉 Lazer', '💊 Saúde', '📚 Educação', '🏠 Moradia', '🛒 Compras', '💰 Investimento', '📦 Outros'\\n\\nRegras de MÉTODO: Se mencionar 'cartão' ou 'crédito' sem especificar qual banco → use 'PERGUNTA_CARTAO'. Se mencionar Nubank → '💜 Nubank'. Se C6 → '⚫ C6 Bank'. Se Itaú → '🟧 Itaú'. Se Bradesco → '🔴 Bradesco'. Se débito → '💳 Débito'. Se pix/transferência → '📱 Pix'. Se dinheiro/espécie → '💵 Dinheiro'. Se nada informado → '📱 Pix'.\\n\\nExemplos:\\n'50 almoço' → {\"valor\":50,\"descricao\":\"Almoço\",\"tipo\":\"Saida\",\"categoria\":\"🍽️ Alimentação\",\"metodo\":\"📱 Pix\",\"data\":\"2026-02-21\"}\\n'jantar no Brooks 80 cartão' → {\"valor\":80,\"descricao\":\"Jantar no Brooks\",\"tipo\":\"Saida\",\"categoria\":\"🍽️ Alimentação\",\"metodo\":\"PERGUNTA_CARTAO\",\"data\":\"2026-02-21\"}\\n'300 passeio cartão nubank' → {\"valor\":300,\"descricao\":\"Passeio\",\"tipo\":\"Saida\",\"categoria\":\"🎉 Lazer\",\"metodo\":\"💜 Nubank\",\"data\":\"2026-02-21\"}\\n'1500 salário' → {\"valor\":1500,\"descricao\":\"Salário\",\"tipo\":\"Entrada\",\"categoria\":\"💰 Investimento\",\"metodo\":\"📱 Pix\",\"data\":\"2026-02-21\"}\\n\\nRetorne APENAS o JSON puro, sem markdown, sem texto."
                 },
                 "promptType": "define",
-                "text": "={{ $json.text }}"
+                "text": "={{ $json.rawText }}"
             },
-            "id": "ai-chat-agent",
-            "name": "AiChatAgent",
+            "id": "ai-finance-parser",
+            "name": "AiFinanceParser",
             "type": "@n8n/n8n-nodes-langchain.agent",
-            "typeVersion": 1.7,
+            "typeVersion": 1.8,
             "position": [
-                950,
-                450
+                550,
+                50
             ]
         },
         {
             "parameters": {
-                "model": "gpt-4o-mini",
-                "options": {}
+                "model": "gpt-4o-mini"
             },
-            "id": "openai-model-chat",
-            "name": "OpenAiModelChat",
+            "id": "openai-finance",
+            "name": "OpenAiFinance",
             "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
             "typeVersion": 1,
             "position": [
-                800,
-                650
-            ],
-            "credentials": {
-                "openAiApi": {
-                    "id": "SUA_CREDENCIAL_ID",
-                    "name": "OpenAi account"
-                }
-            }
-        },
-        {
-            "parameters": {
-                "contextWindowLength": 10,
-                "sessionIdType": "customKey",
-                "sessionKey": "={{ $json.sessionId }}"
-            },
-            "id": "window-memory",
-            "name": "WindowMemoryChat",
-            "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
-            "typeVersion": 1.3,
-            "position": [
-                1050,
-                650
+                550,
+                250
             ]
         },
         {
             "parameters": {
-                "method": "POST",
-                "url": "https://api.telegram.org/botSEU_TOKEN_AQUI/sendMessage",
-                "sendBody": true,
-                "contentType": "raw",
-                "rawContentType": "application/json; charset=utf-8",
-                "body": "={{ JSON.stringify({ chat_id: $node.ChatPrepare.json.sessionId, text: $json.output, reply_to_message_id: $node.ChatPrepare.json.messageId }) }}"
+                "jsCode": "const aiOutput = ($input.first().json.output || '').trim();\\nlet parsed;\\ntry {\\n  parsed = JSON.parse(aiOutput.replace(/```json|```/g, '').trim());\\n} catch(e) {\\n  const m = aiOutput.match(/\\\\{[\\\\s\\\\S]*?\\\\}/);\\n  if (m) { try { parsed = JSON.parse(m[0]); } catch(e2) { throw new Error('JSON invalido: ' + aiOutput); } }\\n  else throw new Error('Sem JSON: ' + aiOutput);\\n}\\nconst prep = $node.FinancePrepare.json;\\nconst valor = parseFloat(String(parsed.valor).replace(',', '.')) || 0;\\nconst valorFormatado = valor.toFixed(2).replace('.', ',').replace(/\\\\B(?=(\\\\d{3})+(?!\\\\d))/g, '.');\\nconst dataBruta = parsed.data || new Date().toISOString().split('T')[0];\\nconst partes = dataBruta.split('-');\\nconst dataFormatada = partes[2] + '/' + partes[1] + '/' + partes[0];\\nconst tipo = (parsed.tipo || 'Saida').includes('Entrada') ? 'Entrada' : 'Saida';\\nconst metodo = parsed.metodo || '📱 Pix';\\nconst categoria = parsed.categoria || '📦 Outros';\\nreturn [{ json: { valor, valorFormatado, descricao: parsed.descricao || 'Sem descricao', tipo, categoria, metodo, data: dataBruta, dataFormatada, chatId: prep.chatId, messageId: prep.messageId } }];"
             },
-            "id": "telegram-reply",
-            "name": "TelegramReplyChat",
-            "type": "n8n-nodes-base.httpRequest",
-            "typeVersion": 4.4,
-            "position": [
-                1250,
-                450
-            ]
-        },
-        {
-            "parameters": {
-                "jsCode": "const data = $input.first().json;\nconst msg = data.message || data.channel_post;\nconst text = msg.text || msg.caption || '';\nlet extractedUrl = '';\nlet platform = '';\n// ... (Lógica de extração de link similar ao workflow original)\nreturn [{ json: { videoUrl: extractedUrl, platform, chatId: msg.chat.id, messageId: msg.message_id, originalText: text } }];"
-            },
-            "id": "code-extract",
-            "name": "CodeExtract",
+            "id": "finance-extract",
+            "name": "FinanceExtract",
             "type": "n8n-nodes-base.code",
             "typeVersion": 2,
             "position": [
-                720,
+                800,
+                50
+            ]
+        },
+        {
+            "parameters": {
+                "authentication": "predefinedCredentialType",
+                "body": "={{\\nJSON.stringify({\\n  parent: { database_id: '<NOTION_DATABASE_ID>' },\\n  properties: {\\n    'Nome': { title: [{ type: 'text', text: { content: $json.descricao } }] },\\n    'Valor': { number: $json.valor },\\n    'Tipo': { select: { name: $json.tipo === 'Entrada' ? 'Entrada' : 'Saída' } },\\n    'Data': { date: { start: $json.data } },\\n    'Categoria': { select: { name: $json.categoria } },\\n    'Método': { select: { name: $json.metodo } },\\n    'Realizado': { checkbox: true }\\n  }\\n})\\n}}"
+            },
+            "id": "notion-finance-save",
+            "name": "NotionFinanceSave",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.4,
+            "position": [
+                1050,
+                50
+            ]
+        },
+        {
+            "parameters": {
+                "body": "={{ JSON.stringify({\\n  chat_id: $node.FinanceExtract.json.chatId || $node.HandleCardCallback.json.chatId,\\n  parse_mode: 'HTML',\\n  text: ($json.tipo === 'Entrada'\\n    ? '💰 <b>Receita Registrada!</b>'\\n    : '💸 <b>Gasto Registrado!</b>')\\n    + '\\\\n──────────────'\\n    + '\\\\n📌 <b>' + $json.descricao + '</b>'\\n    + '\\\\n💵 <b>' + ($json.tipo === 'Entrada' ? '+' : '-') + 'R$ ' + $json.valorFormatado + '</b>'\\n    + '\\\\n🗂️ ' + $json.tipo\\n    + '\\\\n📅 ' + $json.dataFormatada\\n    + '\\\\n──────────────'\\n    + '\\\\n<i>✅ Salvo no Notion com sucesso</i>',\\n  reply_to_message_id: $json.messageId\\n}) }}",
+                "contentType": "raw",
+                "method": "POST",
+                "rawContentType": "application/json; charset=utf-8",
+                "sendBody": true,
+                "url": "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/sendMessage"
+            },
+            "id": "telegram-confirm",
+            "name": "TelegramConfirm",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.4,
+            "position": [
+                1300,
+                50
+            ]
+        },
+        {
+            "parameters": {
+                "amount": 1,
+                "resume": "timeInterval",
+                "unit": "minutes"
+            },
+            "id": "wait-delete",
+            "name": "WaitBeforeDelete",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1.1,
+            "position": [
+                1550,
+                50
+            ]
+        },
+        {
+            "parameters": {
+                "body": "={{ JSON.stringify({ chat_id: $json.result.chat.id, message_id: $json.result.message_id }) }}",
+                "contentType": "raw",
+                "method": "POST",
+                "rawContentType": "application/json",
+                "sendBody": true,
+                "url": "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/deleteMessage"
+            },
+            "id": "delete-confirm-msg",
+            "name": "DeleteConfirmMsg",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.4,
+            "position": [
+                1800,
+                50
+            ]
+        },
+        {
+            "parameters": {
+                "body": "={{ JSON.stringify({ chat_id: $json.result.chat.id, message_id: $node.FinanceExtract.json?.messageId || $node.PhotoFinanceExtract.json?.messageId }) }}",
+                "contentType": "raw",
+                "method": "POST",
+                "rawContentType": "application/json",
+                "sendBody": true,
+                "url": "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/deleteMessage"
+            },
+            "id": "delete-user-msg",
+            "name": "DeleteUserMsg",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.4,
+            "position": [
+                1800,
                 200
             ]
         },
         {
             "parameters": {
-                "resource": "databasePage",
-                "databaseId": {
-                    "__rl": true,
-                    "mode": "id",
-                    "value": "SEU_DATABASE_ID_AQUI"
-                },
-                "title": "={{ $json.output || \"Post do Instagram\" }}",
-                "propertiesUi": {
-                    "propertyValues": [
+                "conditions": {
+                    "combinator": "and",
+                    "conditions": [
                         {
-                            "key": "URL",
-                            "urlValue": "={{ $node.CodeExtract.json.videoUrl }}"
-                        },
-                        {
-                            "key": "Status",
-                            "selectValue": "🔴 Não Assistido"
+                            "id": "is-callback",
+                            "leftValue": "={{ !!$json.callback_query }}",
+                            "operator": {
+                                "operation": "true",
+                                "type": "boolean"
+                            }
                         }
                     ]
                 }
             },
-            "id": "notion-save",
-            "name": "NotionSave",
-            "type": "n8n-nodes-base.notion",
-            "typeVersion": 2.2,
+            "id": "route-input",
+            "name": "RouteInput",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.3,
             "position": [
-                1400,
-                200
-            ],
-            "credentials": {
-                "notionApi": {
-                    "id": "SUA_CREDENCIAL_ID",
-                    "name": "Notion account"
+                -50,
+                100
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const cb = $input.first().json.callback_query;\\nif (!cb) return [];\\nconst chatId = String(cb.message.chat.id);\\nconst cardCode = (cb.data || '').replace('card:', '');\\nconst questionMsgId = cb.message.message_id;\\nconst cbQueryId = cb.id;\\nconst cardMap = { 'Nubank': '💜 Nubank', 'C6': '⚫ C6 Bank', 'Itau': '🟧 Itaú', 'Brad': '🔴 Bradesco', 'Outro': '💳 Outro Cartão' };\\nconst metodo = cardMap[cardCode] || '💳 ' + cardCode;\\nconst pending = ($workflow.staticData.pending || {})[chatId];\\nif (!pending) throw new Error('Transacao pendente nao encontrada');\\ndelete $workflow.staticData.pending[chatId];\\nconst BOT_TOKEN = '<TELEGRAM_BOT_TOKEN>';\\nawait fetch('https://api.telegram.org/bot' + BOT_TOKEN + '/answerCallbackQuery', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ callback_query_id: cbQueryId, text: 'Registrando...' }) });\\nreturn [{ json: { ...pending, metodo, questionMsgId, chatId } }];"
+            },
+            "id": "handle-card-callback",
+            "name": "HandleCardCallback",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                -50,
+                -150
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "combinator": "and",
+                    "conditions": [
+                        {
+                            "id": "check-card",
+                            "leftValue": "={{ $json.metodo }}",
+                            "operator": {
+                                "operation": "equals",
+                                "type": "string"
+                            },
+                            "rightValue": "PERGUNTA_CARTAO"
+                        }
+                    ]
                 }
-            }
+            },
+            "id": "is-card-ambiguous",
+            "name": "IsCardAmbiguous",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.3,
+            "position": [
+                1050,
+                -150
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const data = $input.first().json;\\nconst chatId = String(data.chatId);\\nconst BOT_TOKEN = '<TELEGRAM_BOT_TOKEN>';\\nconst resp = await fetch('https://api.telegram.org/bot' + BOT_TOKEN + '/sendMessage', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ chat_id: chatId, text: '💳 <b>Qual cartão você usou?</b>', parse_mode: 'HTML', reply_markup: { inline_keyboard: [\\n  [{ text: '💜 Nubank', callback_data: 'card:Nubank' }, { text: '⚫ C6 Bank', callback_data: 'card:C6' }],\\n  [{ text: '🟧 Itaú', callback_data: 'card:Itau' }, { text: '🔴 Bradesco', callback_data: 'card:Brad' }],\\n  [{ text: '💳 Outro', callback_data: 'card:Outro' }]\\n] } }) });\\nconst result = await resp.json();\\nconst questionMsgId = result.result?.message_id || 0;\\n$workflow.staticData.pending = $workflow.staticData.pending || {};\\n$workflow.staticData.pending[chatId] = { valor: data.valor, valorFormatado: data.valorFormatado, descricao: data.descricao, tipo: data.tipo, categoria: data.categoria, data: data.data, dataFormatada: data.dataFormatada, chatId, messageId: data.messageId, questionMsgId };\\nreturn [{ json: { ok: true, chatId, questionMsgId } }];"
+            },
+            "id": "store-and-ask",
+            "name": "StoreAndAsk",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1300,
+                -250
+            ]
+        },
+        {
+            "parameters": {
+                "body": "={{ JSON.stringify({ chat_id: $node.HandleCardCallback.json.chatId, message_id: $node.HandleCardCallback.json.questionMsgId }) }}",
+                "contentType": "raw",
+                "method": "POST",
+                "rawContentType": "application/json",
+                "sendBody": true,
+                "url": "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/deleteMessage"
+            },
+            "id": "delete-question-msg",
+            "name": "DeleteQuestionMsg",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.4,
+            "position": [
+                1800,
+                300
+            ],
+            "continueOnFail": true
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "combinator": "and",
+                    "conditions": [
+                        {
+                            "id": "has-photo",
+                            "leftValue": "={{ !!$json.message?.photo }}",
+                            "operator": {
+                                "operation": "true",
+                                "type": "boolean"
+                            }
+                        }
+                    ]
+                }
+            },
+            "id": "is-photo-msg",
+            "name": "IsPhotoMsg",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.3,
+            "position": [
+                200,
+                100
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const msg = $input.first().json.message;\\nconst photos = msg.photo;\\n// Usa foto de resolucao media (indice 1 ou ultimo)\\nconst photo = photos[Math.min(1, photos.length - 1)];\\nconst chatId = msg.chat.id;\\nconst messageId = msg.message_id;\\nconst caption = msg.caption || '';\\nconst BOT_TOKEN = '<TELEGRAM_BOT_TOKEN>';\\n\\n// Obtem caminho do arquivo no Telegram\\nconst fileInfoResp = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${photo.file_id}`);\\nconst fileInfo = await fileInfoResp.json();\\nconst filePath = fileInfo.result.file_path;\\n\\n// Faz download e converte para base64\\nconst imageResp = await fetch(`https://api.telegram.org/file/bot${BOT_TOKEN}/${filePath}`);\\nconst arrayBuf = await imageResp.arrayBuffer();\\nconst base64 = Buffer.from(arrayBuf).toString('base64');\\nconst mimeType = filePath.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';\\n\\nreturn [{ json: { base64Image: base64, mimeType, chatId, messageId, caption } }];"
+            },
+            "id": "prepare-photo-data",
+            "name": "PreparePhotoData",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                450,
+                -250
+            ]
+        },
+        {
+            "parameters": {
+                "authentication": "predefinedCredentialType",
+                "body": "={{ JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 400, messages: [{ role: 'user', content: [{ type: 'text', text: 'Analise este comprovante de pagamento. Extraia as informacoes e retorne APENAS um JSON valido: {\"valor\": number, \"descricao\": \"nome do estabelecimento\", \"tipo\": \"Saida ou Entrada\", \"categoria\": \"categoria\", \"metodo\": \"metodo de pagamento\", \"data\": \"YYYY-MM-DD\"}. Categorias: Alimentacao, Transporte, Lazer, Saude, Educacao, Moradia, Compras, Investimento, Outros. Retorne APENAS o JSON.' }, { type: 'image_url', image_url: { url: 'data:' + $json.mimeType + ';base64,' + $json.base64Image, detail: 'low' } }] }] }) }}",
+                "contentType": "raw",
+                "method": "POST",
+                "nodeCredentialType": "openAiApi",
+                "rawContentType": "application/json",
+                "sendBody": true,
+                "url": "https://api.openai.com/v1/chat/completions"
+            },
+            "id": "openai-vision",
+            "name": "OpenAIVision",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.4,
+            "position": [
+                700,
+                -250
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const resp = $input.first().json;\\nconst aiOutput = (resp.choices?.[0]?.message?.content || '').trim();\\nconst photoData = $node.PreparePhotoData.json;\\n\\nlet parsed;\\ntry {\\n  parsed = JSON.parse(aiOutput.replace(/```json|```/g, '').trim());\\n} catch(e) {\\n  const m = aiOutput.match(/\\\\{[\\\\s\\\\S]*?\\\\}/);\\n  if (m) { try { parsed = JSON.parse(m[0]); } catch(e2) { throw new Error('JSON invalido: ' + aiOutput); } }\\n  else throw new Error('Sem JSON na resposta: ' + aiOutput);\\n}\\n\\nconst valor = parseFloat(String(parsed.valor).replace(',', '.')) || 0;\\nconst valorFormatado = valor.toFixed(2).replace('.', ',').replace(/\\\\B(?=(\\\\d{3})+(?!\\\\d))/g, '.');\\nconst dataBruta = parsed.data || new Date().toISOString().split('T')[0];\\nconst partes = dataBruta.split('-');\\nconst dataFormatada = partes[2] + '/' + partes[1] + '/' + partes[0];\\nconst tipo = (parsed.tipo || 'Saida').includes('Entrada') ? 'Entrada' : 'Saida';\\nconst metodo = parsed.metodo || '📱 Pix';\\nconst catRaw = parsed.categoria || 'Outros';\\nconst catMap = { 'Alimentacao': '🍽️ Alimentação', 'Transporte': '🚌 Transporte', 'Lazer': '🎉 Lazer', 'Saude': '💊 Saúde', 'Educacao': '📚 Educação', 'Moradia': '🏠 Moradia', 'Compras': '🛒 Compras', 'Investimento': '💰 Investimento', 'Outros': '📦 Outros' };\\nconst categoria = catMap[catRaw] || '📦 Outros';\\n\\nreturn [{ json: { valor, valorFormatado, descricao: parsed.descricao || 'Comprovante', tipo, categoria, metodo, data: dataBruta, dataFormatada, chatId: photoData.chatId, messageId: photoData.messageId, questionMsgId: 0 } }];"
+            },
+            "id": "photo-finance-extract",
+            "name": "PhotoFinanceExtract",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                950,
+                -250
+            ]
         }
     ],
     "connections": {
@@ -195,70 +355,211 @@
             "main": [
                 [
                     {
-                        "node": "IfSupported",
+                        "node": "RouteInput",
                         "type": "main",
                         "index": 0
                     }
                 ]
             ]
         },
-        "IfSupported": {
+        "RouteInput": {
             "main": [
                 [
                     {
-                        "node": "CodeExtract",
+                        "node": "HandleCardCallback",
                         "type": "main",
                         "index": 0
                     }
                 ],
                 [
                     {
-                        "node": "ChatPrepare",
+                        "node": "IsPhotoMsg",
                         "type": "main",
                         "index": 0
                     }
                 ]
             ]
         },
-        "ChatPrepare": {
+        "IsPhotoMsg": {
             "main": [
                 [
                     {
-                        "node": "AiChatAgent",
+                        "node": "PreparePhotoData",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "IfFinance",
                         "type": "main",
                         "index": 0
                     }
                 ]
             ]
         },
-        "AiChatAgent": {
+        "IfFinance": {
             "main": [
                 [
                     {
-                        "node": "TelegramReplyChat",
+                        "node": "FinancePrepare",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "IgnoreNonFinance",
                         "type": "main",
                         "index": 0
                     }
                 ]
             ]
         },
-        "OpenAiModelChat": {
+        "FinancePrepare": {
+            "main": [
+                [
+                    {
+                        "node": "AiFinanceParser",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "AiFinanceParser": {
+            "main": [
+                [
+                    {
+                        "node": "FinanceExtract",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "FinanceExtract": {
+            "main": [
+                [
+                    {
+                        "node": "IsCardAmbiguous",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "IsCardAmbiguous": {
+            "main": [
+                [
+                    {
+                        "node": "StoreAndAsk",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "NotionFinanceSave",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "PreparePhotoData": {
+            "main": [
+                [
+                    {
+                        "node": "OpenAIVision",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "OpenAIVision": {
+            "main": [
+                [
+                    {
+                        "node": "PhotoFinanceExtract",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "PhotoFinanceExtract": {
+            "main": [
+                [
+                    {
+                        "node": "IsCardAmbiguous",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "HandleCardCallback": {
+            "main": [
+                [
+                    {
+                        "node": "NotionFinanceSave",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "NotionFinanceSave": {
+            "main": [
+                [
+                    {
+                        "node": "TelegramConfirm",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "TelegramConfirm": {
+            "main": [
+                [
+                    {
+                        "node": "WaitBeforeDelete",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "WaitBeforeDelete": {
+            "main": [
+                [
+                    {
+                        "node": "DeleteConfirmMsg",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "DeleteUserMsg",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "DeleteQuestionMsg",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "OpenAiFinance": {
             "ai_languageModel": [
                 [
                     {
-                        "node": "AiChatAgent",
+                        "node": "AiFinanceParser",
                         "type": "ai_languageModel",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "WindowMemoryChat": {
-            "ai_memory": [
-                [
-                    {
-                        "node": "AiChatAgent",
-                        "type": "ai_memory",
                         "index": 0
                     }
                 ]
