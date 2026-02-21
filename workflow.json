@@ -5,6 +5,7 @@
             "parameters": {
                 "updates": [
                     "message",
+                    "channel_post",
                     "callback_query"
                 ]
             },
@@ -102,7 +103,12 @@
         {
             "parameters": {
                 "authentication": "predefinedCredentialType",
-                "body": "={{\\nJSON.stringify({\\n  parent: { database_id: '<NOTION_DATABASE_ID>' },\\n  properties: {\\n    'Nome': { title: [{ type: 'text', text: { content: $json.descricao } }] },\\n    'Valor': { number: $json.valor },\\n    'Tipo': { select: { name: $json.tipo === 'Entrada' ? 'Entrada' : 'Saída' } },\\n    'Data': { date: { start: $json.data } },\\n    'Categoria': { select: { name: $json.categoria } },\\n    'Método': { select: { name: $json.metodo } },\\n    'Realizado': { checkbox: true }\\n  }\\n})\\n}}"
+                "body": "={{\nJSON.stringify({\n  parent: { database_id: '<NOTION_DATABASE_ID>' },\n  properties: {\n    'Nome': { title: [{ type: 'text', text: { content: $json.descricao } }] },\n    'Valor': { number: $json.valor },\n    'Tipo': { select: { name: $json.tipo === 'Entrada' ? 'Entrada' : 'Saída' } },\n    'Data': { date: { start: $json.data } },\n    'Categoria': { select: { name: $json.categoria } },\n    'Método': { select: { name: $json.metodo } },\n    'Realizado': { checkbox: true }\n  }\n})\n}}",
+                "contentType": "raw",
+                "method": "POST",
+                "rawContentType": "application/json",
+                "sendBody": true,
+                "url": "https://api.notion.com/v1/pages"
             },
             "id": "notion-finance-save",
             "name": "NotionFinanceSave",
@@ -115,7 +121,7 @@
         },
         {
             "parameters": {
-                "body": "={{ JSON.stringify({\\n  chat_id: $node.FinanceExtract.json.chatId || $node.HandleCardCallback.json.chatId,\\n  parse_mode: 'HTML',\\n  text: ($json.tipo === 'Entrada'\\n    ? '💰 <b>Receita Registrada!</b>'\\n    : '💸 <b>Gasto Registrado!</b>')\\n    + '\\\\n──────────────'\\n    + '\\\\n📌 <b>' + $json.descricao + '</b>'\\n    + '\\\\n💵 <b>' + ($json.tipo === 'Entrada' ? '+' : '-') + 'R$ ' + $json.valorFormatado + '</b>'\\n    + '\\\\n🗂️ ' + $json.tipo\\n    + '\\\\n📅 ' + $json.dataFormatada\\n    + '\\\\n──────────────'\\n    + '\\\\n<i>✅ Salvo no Notion com sucesso</i>',\\n  reply_to_message_id: $json.messageId\\n}) }}",
+                "body": "={{ JSON.stringify({\n  chat_id: ($node[\"FinanceExtract\"].json || {}).chatId || ($node[\"HandleCardCallback\"].json || {}).chatId || ($node[\"PhotoFinanceExtract\"].json || {}).chatId,\n  parse_mode: 'HTML',\n  text: ($json.tipo === 'Entrada'\n    ? '💰 <b>Receita Registrada!</b>'\n    : '💸 <b>Gasto Registrado!</b>')\n    + '\\n──────────────'\n    + '\\n📌 <b>' + ($json.descricao || 'Sem descrição') + '</b>'\n    + '\\n💵 <b>' + ($json.tipo === 'Entrada' ? '+' : '-') + 'R$ ' + ($json.valorFormatado || '0,00') + '</b>'\n    + '\\n🗂️ ' + ($json.tipo || 'Saída')\n    + '\\n📅 ' + ($json.dataFormatada || 'Data ignorada')\n    + '\\n──────────────'\n    + '\\n<i>✅ Salvo no Notion com sucesso</i>',\n  reply_to_message_id: ($node[\"FinanceExtract\"].json || {}).messageId || ($node[\"HandleCardCallback\"].json || {}).messageId || ($node[\"PhotoFinanceExtract\"].json || {}).messageId\n}) }}",
                 "contentType": "raw",
                 "method": "POST",
                 "rawContentType": "application/json; charset=utf-8",
@@ -148,7 +154,7 @@
         },
         {
             "parameters": {
-                "body": "={{ JSON.stringify({ chat_id: $json.result.chat.id, message_id: $json.result.message_id }) }}",
+                "body": "={{ JSON.stringify({ chat_id: ($json.result || {}).chat.id || ($json.message || {}).chat.id, message_id: ($json.result || {}).message_id || ($json.message || {}).message_id }) }}",
                 "contentType": "raw",
                 "method": "POST",
                 "rawContentType": "application/json",
@@ -166,7 +172,7 @@
         },
         {
             "parameters": {
-                "body": "={{ JSON.stringify({ chat_id: $json.result.chat.id, message_id: $node.FinanceExtract.json?.messageId || $node.PhotoFinanceExtract.json?.messageId }) }}",
+                "body": "={{ JSON.stringify({ chat_id: $json.result.chat.id, message_id: ($node[\"FinanceExtract\"].json || {}).messageId || ($node[\"PhotoFinanceExtract\"].json || {}).messageId || ($node[\"PrepareIdeia\"].json || {}).messageId }) }}",
                 "contentType": "raw",
                 "method": "POST",
                 "rawContentType": "application/json",
@@ -261,7 +267,7 @@
         },
         {
             "parameters": {
-                "body": "={{ JSON.stringify({ chat_id: $node.HandleCardCallback.json.chatId, message_id: $node.HandleCardCallback.json.questionMsgId }) }}",
+                "body": "={{ JSON.stringify({ chat_id: ($node[\"HandleCardCallback\"].json || {}).chatId || ($node[\"FinanceExtract\"].json || {}).chatId || ($node[\"PhotoFinanceExtract\"].json || {}).chatId, message_id: ($node[\"HandleCardCallback\"].json || {}).questionMsgId || ($node[\"StoreAndAsk\"].json || {}).questionMsgId || 0 }) }}",
                 "contentType": "raw",
                 "method": "POST",
                 "rawContentType": "application/json",
@@ -285,7 +291,7 @@
                     "conditions": [
                         {
                             "id": "has-photo",
-                            "leftValue": "={{ !!$json.message?.photo }}",
+                            "leftValue": "={{ !!(($json.message || $json.channel_post || {}).photo) }}",
                             "operator": {
                                 "operation": "true",
                                 "type": "boolean"
@@ -305,7 +311,7 @@
         },
         {
             "parameters": {
-                "jsCode": "const msg = $input.first().json.message;\\nconst photos = msg.photo;\\n// Usa foto de resolucao media (indice 1 ou ultimo)\\nconst photo = photos[Math.min(1, photos.length - 1)];\\nconst chatId = msg.chat.id;\\nconst messageId = msg.message_id;\\nconst caption = msg.caption || '';\\nconst BOT_TOKEN = '<TELEGRAM_BOT_TOKEN>';\\n\\n// Obtem caminho do arquivo no Telegram\\nconst fileInfoResp = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${photo.file_id}`);\\nconst fileInfo = await fileInfoResp.json();\\nconst filePath = fileInfo.result.file_path;\\n\\n// Faz download e converte para base64\\nconst imageResp = await fetch(`https://api.telegram.org/file/bot${BOT_TOKEN}/${filePath}`);\\nconst arrayBuf = await imageResp.arrayBuffer();\\nconst base64 = Buffer.from(arrayBuf).toString('base64');\\nconst mimeType = filePath.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';\\n\\nreturn [{ json: { base64Image: base64, mimeType, chatId, messageId, caption } }];"
+                "jsCode": "const input = $input.first().json;\nconst msg = input.message || input.channel_post;\nif (!msg || !msg.photo) return [];\nconst photos = msg.photo;\nconst photo = photos[Math.min(1, photos.length - 1)];\nconst chatId = msg.chat.id;\nconst messageId = msg.message_id;\nconst caption = msg.caption || '';\nconst BOT_TOKEN = '<TELEGRAM_BOT_TOKEN>';\n\nconst fileInfoResp = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${photo.file_id}`);\nconst fileInfo = await fileInfoResp.json();\nconst filePath = fileInfo.result.file_path;\n\nconst imageResp = await fetch(`https://api.telegram.org/file/bot${BOT_TOKEN}/${filePath}`);\nconst arrayBuf = await imageResp.arrayBuffer();\nconst base64 = Buffer.from(arrayBuf).toString('base64');\nconst mimeType = filePath.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';\n\nreturn [{ json: { base64Image: base64, mimeType, chatId, messageId, caption } }];"
             },
             "id": "prepare-photo-data",
             "name": "PreparePhotoData",
@@ -540,13 +546,7 @@
                         "index": 0
                     }
                 ],
-                [
-                    {
-                        "node": "IgnoreNonFinance",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
+                []
             ]
         },
         "FinancePrepare": {
